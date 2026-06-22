@@ -1,0 +1,7 @@
+name 2013年张家口职工象棋赛
+judje 刘同喜
+turn_total 11
+turn 35
+turnfinsh 0
+state 3
+importfn D:/name_list.txt

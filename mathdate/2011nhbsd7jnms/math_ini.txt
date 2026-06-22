@@ -1,0 +1,7 @@
+name 2011年河北省第7届农民赛
+judje 林从
+turn_total 9
+turn 7
+turnfinsh 0
+state 3
+importfn D:/name_list.txt

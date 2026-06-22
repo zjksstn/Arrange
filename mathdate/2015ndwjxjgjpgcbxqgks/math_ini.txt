@@ -1,0 +1,7 @@
+name 2015年第五届辛集国际皮革城杯象棋公开赛
+judje 柳碧兰
+turn_total 13
+turn 16
+turnfinsh 0
+state 3
+importfn D:/Python38/arrange/sgname.txt

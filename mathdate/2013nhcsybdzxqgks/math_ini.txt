@@ -1,0 +1,7 @@
+name 2013年华晨实业杯德州象棋公开赛
+judje 周口
+turn_total 11
+turn 3
+turnfinsh 0
+state 3
+importfn D:/name_list.txt

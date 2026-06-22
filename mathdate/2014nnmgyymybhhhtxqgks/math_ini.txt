@@ -1,0 +1,7 @@
+name 2014年内蒙古羊羊牧业杯呼和浩特象棋公开赛
+judje 范冰富
+turn_total 13
+turn 15
+turnfinsh 0
+state 3
+importfn D:/Python38/arrange/sgname.txt
