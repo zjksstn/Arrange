@@ -34,7 +34,7 @@
 ```bat
 python -m venv venv
 venv\Scripts\python -m pip install --upgrade pip
-venv\Scripts\python -m pip install pyside6 reportlab pillow openpyxl
+venv\Scripts\python -m pip install pyside6 reportlab pillow openpyxl pypdf
 venv\Scripts\python app_qt.py
 ```
 
