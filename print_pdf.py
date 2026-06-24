@@ -17,7 +17,7 @@ import subprocess
 from reportlab.lib.pagesizes import A4
 from reportlab.lib.units import mm
 from reportlab.lib import colors
-from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer
+from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer, PageBreak
 from reportlab.lib.styles import ParagraphStyle
 from reportlab.lib.enums import TA_CENTER
 from reportlab.pdfbase import pdfmetrics
@@ -271,6 +271,53 @@ def generate_certificates_pdf(winners, event_name, group_name, out_path,
             c.drawRightString(pw * 0.80, ph * 0.205, date_str)
         c.showPage()
     c.save()
+    return out_path
+
+
+def generate_orderbook_pdf(event_name, judge, date_str, groups_data, out_path):
+    """竞赛秩序册(赛事级):封面页 + 各组参赛名单。
+    groups_data: [{"name":.., "total_rounds":.., "rows":[[编号,姓名,性别,团队,等级分], ...]}, ...]"""
+    doc = SimpleDocTemplate(
+        out_path, pagesize=A4,
+        leftMargin=15 * mm, rightMargin=15 * mm, topMargin=18 * mm, bottomMargin=15 * mm,
+        title="%s 竞赛秩序册" % event_name,
+    )
+    big = ParagraphStyle("big", fontName=FONT, fontSize=28, alignment=TA_CENTER, leading=42, spaceAfter=10)
+    sub = ParagraphStyle("sub", fontName=FONT, fontSize=22, alignment=TA_CENTER, leading=34, spaceAfter=8)
+    info = ParagraphStyle("info", fontName=FONT, fontSize=15, alignment=TA_CENTER, leading=28)
+    sect = ParagraphStyle("sect", fontName=FONT, fontSize=16, alignment=TA_CENTER, leading=24, spaceAfter=8)
+
+    # 封面
+    story = [Spacer(1, 55 * mm), Paragraph(event_name, big),
+             Paragraph("竞 赛 秩 序 册", sub), Spacer(1, 28 * mm)]
+    if judge:
+        story.append(Paragraph("裁判长：%s" % judge, info))
+    story.append(Paragraph("比赛办法：积分编排制(瑞士制)", info))
+    story.append(Paragraph("参赛组别：%d 个" % len(groups_data), info))
+    if date_str:
+        story.append(Paragraph(date_str, info))
+    story.append(PageBreak())
+
+    # 各组参赛名单
+    header = ["编号", "姓名", "性别", "团队", "等级分"]
+    widths = _scaled_widths([14, 24, 14, 40, 18], (A4[0] / mm) - 30)
+    style = TableStyle([
+        ("FONTNAME", (0, 0), (-1, -1), FONT),
+        ("FONTSIZE", (0, 0), (-1, 0), 11), ("FONTSIZE", (0, 1), (-1, -1), 10),
+        ("ALIGN", (0, 0), (-1, -1), "CENTER"), ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+        ("GRID", (0, 0), (-1, -1), 0.5, colors.black),
+        ("BACKGROUND", (0, 0), (-1, 0), colors.Color(0.85, 0.85, 0.85)),
+        ("TOPPADDING", (0, 0), (-1, -1), 4), ("BOTTOMPADDING", (0, 0), (-1, -1), 4),
+    ])
+    for i, gd in enumerate(groups_data):
+        story.append(Paragraph("%s　参赛名单(%d 人 · 共 %d 轮)"
+                               % (gd["name"], len(gd["rows"]), gd["total_rounds"]), sect))
+        tbl = Table([header] + gd["rows"], colWidths=widths, repeatRows=1)
+        tbl.setStyle(style)
+        story.append(tbl)
+        if i < len(groups_data) - 1:
+            story.append(PageBreak())
+    doc.build(story)
     return out_path
 
 

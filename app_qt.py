@@ -1223,8 +1223,30 @@ class MainWindow(QMainWindow):
             self.export_certificates()
         elif name == "记分卡":
             self.export_scorecards()
+        elif name == "赛事秩序册":
+            self.export_orderbook()
         else:
             self.statusBar().showMessage("报表:%s(待接入)" % name, 2000)
+
+    def export_orderbook(self):
+        import datetime
+        ev = self.cur_event
+        groups_data = []
+        for g in ev.groups:
+            rows = [[str(p.number), p.name, p.gender, p.team, str(p.rating)]
+                    for p in sorted(g.players, key=lambda x: x.number)]
+            groups_data.append({"name": g.name, "total_rounds": g.total_rounds, "rows": rows})
+        out = os.path.join(tournament.events_dir(),
+                           "%s_竞赛秩序册.pdf" % tournament.safe_filename(ev.name))
+        try:
+            import print_pdf
+            print_pdf.generate_orderbook_pdf(ev.name, ev.judge,
+                                             datetime.date.today().strftime("%Y年%m月%d日"),
+                                             groups_data, out)
+        except Exception as e:
+            QMessageBox.critical(self, "生成 PDF 失败", str(e)); return
+        open_pdf_or_inform(self, out)
+        self.statusBar().showMessage("已生成竞赛秩序册(%d 个组别)" % len(groups_data), 4000)
 
     def export_scorecards(self):
         g = self.group
