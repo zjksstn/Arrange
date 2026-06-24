@@ -547,7 +547,7 @@ class ExcelImportDialog(QDialog):
 
 
 class LeftPanel(QWidget):
-    REPORTS = ["本轮对阵表", "总成绩表", "荣誉证书", "选手花名册", "台号卡", "记分卡"]
+    REPORTS = ["本轮对阵表", "总成绩表", "荣誉证书", "台号卡", "记分卡"]
 
     def __init__(self, cb):
         super().__init__()
@@ -573,7 +573,7 @@ class LeftPanel(QWidget):
             gb.addWidget(b)
         lay.addLayout(gb)
 
-        lay.addSpacing(6); lay.addWidget(self._title("打印报表"))
+        lay.addSpacing(6); lay.addWidget(self._title("打印表单"))
         self.report_btns = {}
         for name in self.REPORTS:
             b = QPushButton(name); b.setProperty("role", "report")
@@ -657,7 +657,7 @@ class MainWindow(QMainWindow):
         self.switch_menu.aboutToShow.connect(self._populate_switch_menu)
         switch_btn.setMenu(self.switch_menu); tb.addWidget(switch_btn)
 
-        tools = ["花名册", "生成秩序册"] + (["随机结果(测试)"] if DEV_MODE else [])
+        tools = ["花名册", "生成秩序册"]
         for text in tools:
             act = QAction(text, self)
             act.triggered.connect(lambda checked=False, t=text: self.on_tool(t))
@@ -733,7 +733,8 @@ class MainWindow(QMainWindow):
         if not started:                              # 报名阶段:增删导入
             for text, slot in [("添加一行", self.on_roster_add), ("删除选中", self.on_roster_del),
                                ("从 txt 导入", self.on_roster_import_txt),
-                               ("从 Excel 导入", self.on_roster_import_excel)]:
+                               ("从 Excel 导入", self.on_roster_import_excel),
+                               ("打印花名册", self.export_roster)]:
                 b = QPushButton(text); b.setProperty("role", "filebtn"); b.clicked.connect(slot)
                 bar.addWidget(b)
             bar.addStretch()
@@ -748,7 +749,8 @@ class MainWindow(QMainWindow):
             bar.addWidget(start_btn)
             tip = "　报名阶段:录入名单 → 勾选抽签条件(仅作用首轮)→ 点「抽签编排首轮」开赛"
         else:                                        # 已开赛:退赛/复赛
-            for text, slot in [("退赛…", self.on_withdraw), ("复赛…", self.on_reenter)]:
+            for text, slot in [("退赛…", self.on_withdraw), ("复赛…", self.on_reenter),
+                               ("打印花名册", self.export_roster)]:
                 b = QPushButton(text); b.setProperty("role", "filebtn"); b.clicked.connect(slot)
                 bar.addWidget(b)
             bar.addStretch()
@@ -1217,8 +1219,6 @@ class MainWindow(QMainWindow):
             if self.group.finished:
                 StandingsDialog(self.group, "%s · %s" % (self.cur_event.name, self.group.name),
                                 self.cur_event.judge, self).exec()
-        elif name == "选手花名册":
-            self.export_roster()
         elif name == "台号卡":
             self.export_tablecards()
         elif name == "荣誉证书":
@@ -1238,24 +1238,40 @@ class MainWindow(QMainWindow):
         return None
 
     def export_orderbook(self):
-        """秩序册:我们出封面+封底,中间夹用户自撰的内容 PDF(可选)。"""
+        """秩序册:我们出封面+封底,中间夹用户自撰的正文(doc/docx/txt,自动转 PDF)。"""
         import datetime
         ev = self.cur_event
-        content, _ = QFileDialog.getOpenFileName(
-            self, "选择秩序册内容 PDF(主办方自撰;取消则只出封面封底)", "",
-            "PDF 文件 (*.pdf);;所有文件 (*)")
+        src, _ = QFileDialog.getOpenFileName(
+            self, "请选择秩序册正文的文件（类型doc,docx,或txt）", "",
+            "正文文件 (*.doc *.docx *.txt *.pdf);;所有文件 (*)")
+        import print_pdf
+        content_pdf, tmp = None, None
+        if src:
+            try:
+                if src.lower().endswith(".pdf"):
+                    content_pdf = src
+                else:
+                    tmp = os.path.join(tournament.events_dir(), "_正文转换_tmp.pdf")
+                    content_pdf = print_pdf.content_to_pdf(src, tmp)
+            except Exception as e:
+                QMessageBox.critical(self, "正文转换失败",
+                                     "无法把所选正文转成 PDF:\n%s\n\n"
+                                     "(.doc/.docx 需本机安装 Word;也可先把正文另存为 PDF 或 txt)" % e)
+                return
         out = os.path.join(tournament.events_dir(),
                            "%s_竞赛秩序册.pdf" % tournament.safe_filename(ev.name))
         try:
-            import print_pdf
             print_pdf.generate_orderbook_pdf(
                 ev.name, ev.judge, datetime.date.today().strftime("%Y年%m月%d日"),
-                out, content_pdf=(content or None), cover_bg=self._orderbook_bg())
+                out, content_pdf=content_pdf, cover_bg=self._orderbook_bg())
         except Exception as e:
             QMessageBox.critical(self, "生成 PDF 失败", str(e)); return
+        finally:
+            if tmp and os.path.exists(tmp):
+                os.remove(tmp)
         open_pdf_or_inform(self, out)
-        msg = "已生成秩序册(封面 + 你的内容 + 封底)" if content else "已生成秩序册封面+封底(未选内容)"
-        self.statusBar().showMessage(msg, 4000)
+        self.statusBar().showMessage("已生成秩序册(封面 + 正文 + 封底)" if src
+                                     else "已生成秩序册封面+封底(未选正文)", 4000)
 
     def export_scorecards(self):
         g = self.group

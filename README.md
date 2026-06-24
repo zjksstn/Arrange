@@ -35,6 +35,8 @@
 python -m venv venv
 venv\Scripts\python -m pip install --upgrade pip
 venv\Scripts\python -m pip install pyside6 reportlab pillow openpyxl pypdf
+:: 可选:秩序册正文用 .doc/.docx 时需要(Windows + 已装 Word);只用 txt/pdf 可不装
+venv\Scripts\python -m pip install comtypes
 venv\Scripts\python app_qt.py
 ```
 

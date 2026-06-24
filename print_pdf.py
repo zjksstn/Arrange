@@ -300,6 +300,49 @@ def _draw_orderbook_face(c, event_name, judge, date_str, bg, is_back):
             c.drawCentredString(cx, ph * 0.46, date_str)
 
 
+def _txt_to_pdf(src, out_pdf):
+    """把 txt 渲染成 PDF(跨平台,内置宋体)。"""
+    with open(src, encoding="utf-8", errors="replace") as f:
+        text = f.read()
+    doc = SimpleDocTemplate(out_pdf, pagesize=A4, leftMargin=20 * mm, rightMargin=20 * mm,
+                            topMargin=20 * mm, bottomMargin=18 * mm)
+    style = ParagraphStyle("body", fontName=FONT, fontSize=12, leading=20)
+    story = []
+    for line in text.split("\n"):
+        s = line.rstrip().replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+        story.append(Paragraph(s or "&nbsp;", style))
+    doc.build(story)
+    return out_pdf
+
+
+def _word_to_pdf(src, out_pdf):
+    """用本机 Word(COM)把 doc/docx 转 PDF —— 需 Windows + 安装 Word。"""
+    import comtypes.client
+    src, out_pdf = os.path.abspath(src), os.path.abspath(out_pdf)
+    word = comtypes.client.CreateObject("Word.Application")
+    word.Visible = False
+    try:
+        d = word.Documents.Open(src)
+        d.ExportAsFixedFormat(out_pdf, 17)       # 17 = wdExportFormatPDF
+        d.Close(False)
+    finally:
+        word.Quit()
+    return out_pdf
+
+
+def content_to_pdf(src, out_pdf):
+    """把秩序册正文文件(.txt / .doc / .docx / .pdf)转成 PDF。返回 PDF 路径。
+    .pdf 直接返回原路径;.txt 用 reportlab 渲染;.doc/.docx 调本机 Word。"""
+    low = src.lower()
+    if low.endswith(".pdf"):
+        return src
+    if low.endswith(".txt"):
+        return _txt_to_pdf(src, out_pdf)
+    if low.endswith((".doc", ".docx")):
+        return _word_to_pdf(src, out_pdf)
+    raise ValueError("不支持的正文类型:%s(请用 doc/docx/txt/pdf)" % os.path.splitext(src)[1])
+
+
 def generate_orderbook_pdf(event_name, judge, date_str, out_path,
                            content_pdf=None, cover_bg=None):
     """竞赛秩序册:封面 + (可选)用户内容 PDF + 封底,合并为一个 PDF。
