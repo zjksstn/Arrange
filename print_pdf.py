@@ -274,50 +274,57 @@ def generate_certificates_pdf(winners, event_name, group_name, out_path,
     return out_path
 
 
-def generate_orderbook_pdf(event_name, judge, date_str, groups_data, out_path):
-    """竞赛秩序册(赛事级):封面页 + 各组参赛名单。
-    groups_data: [{"name":.., "total_rounds":.., "rows":[[编号,姓名,性别,团队,等级分], ...]}, ...]"""
-    doc = SimpleDocTemplate(
-        out_path, pagesize=A4,
-        leftMargin=15 * mm, rightMargin=15 * mm, topMargin=18 * mm, bottomMargin=15 * mm,
-        title="%s 竞赛秩序册" % event_name,
-    )
-    big = ParagraphStyle("big", fontName=FONT, fontSize=28, alignment=TA_CENTER, leading=42, spaceAfter=10)
-    sub = ParagraphStyle("sub", fontName=FONT, fontSize=22, alignment=TA_CENTER, leading=34, spaceAfter=8)
-    info = ParagraphStyle("info", fontName=FONT, fontSize=15, alignment=TA_CENTER, leading=28)
-    sect = ParagraphStyle("sect", fontName=FONT, fontSize=16, alignment=TA_CENTER, leading=24, spaceAfter=8)
+def _draw_orderbook_face(c, event_name, judge, date_str, bg, is_back):
+    """画秩序册封面(is_back=False)或封底(True)的一页。"""
+    from reportlab.lib.colors import HexColor
+    pw, ph = A4
+    if bg and os.path.exists(bg):
+        try:
+            c.drawImage(bg, 0, 0, pw, ph, preserveAspectRatio=False, mask="auto")
+        except Exception:
+            pass
+    cx = pw / 2
+    c.setFillColor(HexColor("#2c2c2a"))
+    if not is_back:                              # 封面
+        c.setFont(FONT, 30); c.drawCentredString(cx, ph * 0.66, event_name)
+        c.setFont(FONT, 22); c.drawCentredString(cx, ph * 0.56, "竞 赛 秩 序 册")
+        c.setFont(FONT, 15)
+        if judge:
+            c.drawCentredString(cx, ph * 0.30, "裁判长：%s" % judge)
+        if date_str:
+            c.drawCentredString(cx, ph * 0.25, date_str)
+    else:                                        # 封底
+        c.setFont(FONT, 18); c.drawCentredString(cx, ph * 0.52, event_name)
+        c.setFont(FONT, 12)
+        if date_str:
+            c.drawCentredString(cx, ph * 0.46, date_str)
 
-    # 封面
-    story = [Spacer(1, 55 * mm), Paragraph(event_name, big),
-             Paragraph("竞 赛 秩 序 册", sub), Spacer(1, 28 * mm)]
-    if judge:
-        story.append(Paragraph("裁判长：%s" % judge, info))
-    story.append(Paragraph("比赛办法：积分编排制(瑞士制)", info))
-    story.append(Paragraph("参赛组别：%d 个" % len(groups_data), info))
-    if date_str:
-        story.append(Paragraph(date_str, info))
-    story.append(PageBreak())
 
-    # 各组参赛名单
-    header = ["编号", "姓名", "性别", "团队", "等级分"]
-    widths = _scaled_widths([14, 24, 14, 40, 18], (A4[0] / mm) - 30)
-    style = TableStyle([
-        ("FONTNAME", (0, 0), (-1, -1), FONT),
-        ("FONTSIZE", (0, 0), (-1, 0), 11), ("FONTSIZE", (0, 1), (-1, -1), 10),
-        ("ALIGN", (0, 0), (-1, -1), "CENTER"), ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
-        ("GRID", (0, 0), (-1, -1), 0.5, colors.black),
-        ("BACKGROUND", (0, 0), (-1, 0), colors.Color(0.85, 0.85, 0.85)),
-        ("TOPPADDING", (0, 0), (-1, -1), 4), ("BOTTOMPADDING", (0, 0), (-1, -1), 4),
-    ])
-    for i, gd in enumerate(groups_data):
-        story.append(Paragraph("%s　参赛名单(%d 人 · 共 %d 轮)"
-                               % (gd["name"], len(gd["rows"]), gd["total_rounds"]), sect))
-        tbl = Table([header] + gd["rows"], colWidths=widths, repeatRows=1)
-        tbl.setStyle(style)
-        story.append(tbl)
-        if i < len(groups_data) - 1:
-            story.append(PageBreak())
-    doc.build(story)
+def generate_orderbook_pdf(event_name, judge, date_str, out_path,
+                           content_pdf=None, cover_bg=None):
+    """竞赛秩序册:封面 + (可选)用户内容 PDF + 封底,合并为一个 PDF。
+    内容由主办方自行撰写(Word 导出 PDF),我们只出封面封底。content_pdf 为空则只出封面封底。"""
+    from io import BytesIO
+    from reportlab.pdfgen import canvas as _canvas
+    from pypdf import PdfWriter, PdfReader
+
+    def face(is_back):
+        buf = BytesIO()
+        c = _canvas.Canvas(buf, pagesize=A4)
+        _draw_orderbook_face(c, event_name, judge, date_str, cover_bg, is_back)
+        c.showPage(); c.save(); buf.seek(0)
+        return buf
+
+    writer = PdfWriter()
+    for p in PdfReader(face(False)).pages:       # 封面
+        writer.add_page(p)
+    if content_pdf and os.path.exists(content_pdf):
+        for p in PdfReader(content_pdf).pages:   # 用户内容
+            writer.add_page(p)
+    for p in PdfReader(face(True)).pages:        # 封底
+        writer.add_page(p)
+    with open(out_path, "wb") as f:
+        writer.write(f)
     return out_path
 
 

@@ -547,7 +547,7 @@ class ExcelImportDialog(QDialog):
 
 
 class LeftPanel(QWidget):
-    REPORTS = ["本轮对阵表", "总成绩表", "荣誉证书", "选手花名册", "赛事秩序册", "台号卡", "记分卡"]
+    REPORTS = ["本轮对阵表", "总成绩表", "荣誉证书", "选手花名册", "台号卡", "记分卡"]
 
     def __init__(self, cb):
         super().__init__()
@@ -657,7 +657,7 @@ class MainWindow(QMainWindow):
         self.switch_menu.aboutToShow.connect(self._populate_switch_menu)
         switch_btn.setMenu(self.switch_menu); tb.addWidget(switch_btn)
 
-        tools = ["花名册"] + (["随机结果(测试)"] if DEV_MODE else [])
+        tools = ["花名册", "生成秩序册"] + (["随机结果(测试)"] if DEV_MODE else [])
         for text in tools:
             act = QAction(text, self)
             act.triggered.connect(lambda checked=False, t=text: self.on_tool(t))
@@ -1191,6 +1191,8 @@ class MainWindow(QMainWindow):
             self.on_random_results()
         elif text == "花名册":
             self.on_roster()
+        elif text == "生成秩序册":
+            self.export_orderbook()
         else:
             self.statusBar().showMessage("工具栏:%s(功能待接入)" % text, 2000)
 
@@ -1223,30 +1225,37 @@ class MainWindow(QMainWindow):
             self.export_certificates()
         elif name == "记分卡":
             self.export_scorecards()
-        elif name == "赛事秩序册":
-            self.export_orderbook()
         else:
             self.statusBar().showMessage("报表:%s(待接入)" % name, 2000)
 
+    @staticmethod
+    def _orderbook_bg():
+        base = os.path.dirname(os.path.abspath(__file__))
+        for fn in ("秩序册封面.png", "秩序册封面.jpg", "秩序册封面.jpeg"):
+            p = os.path.join(base, fn)
+            if os.path.exists(p):
+                return p
+        return None
+
     def export_orderbook(self):
+        """秩序册:我们出封面+封底,中间夹用户自撰的内容 PDF(可选)。"""
         import datetime
         ev = self.cur_event
-        groups_data = []
-        for g in ev.groups:
-            rows = [[str(p.number), p.name, p.gender, p.team, str(p.rating)]
-                    for p in sorted(g.players, key=lambda x: x.number)]
-            groups_data.append({"name": g.name, "total_rounds": g.total_rounds, "rows": rows})
+        content, _ = QFileDialog.getOpenFileName(
+            self, "选择秩序册内容 PDF(主办方自撰;取消则只出封面封底)", "",
+            "PDF 文件 (*.pdf);;所有文件 (*)")
         out = os.path.join(tournament.events_dir(),
                            "%s_竞赛秩序册.pdf" % tournament.safe_filename(ev.name))
         try:
             import print_pdf
-            print_pdf.generate_orderbook_pdf(ev.name, ev.judge,
-                                             datetime.date.today().strftime("%Y年%m月%d日"),
-                                             groups_data, out)
+            print_pdf.generate_orderbook_pdf(
+                ev.name, ev.judge, datetime.date.today().strftime("%Y年%m月%d日"),
+                out, content_pdf=(content or None), cover_bg=self._orderbook_bg())
         except Exception as e:
             QMessageBox.critical(self, "生成 PDF 失败", str(e)); return
         open_pdf_or_inform(self, out)
-        self.statusBar().showMessage("已生成竞赛秩序册(%d 个组别)" % len(groups_data), 4000)
+        msg = "已生成秩序册(封面 + 你的内容 + 封底)" if content else "已生成秩序册封面+封底(未选内容)"
+        self.statusBar().showMessage(msg, 4000)
 
     def export_scorecards(self):
         g = self.group
